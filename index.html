@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACICTS</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0a0a0a;
+            --surface-color: #1a1a1a;
+            --accent-color: #ffd700;
+            --text-color: #ffffff;
+            --text-dim: #888888;
+            --error-color: #ff4444;
+            --warning-color: #ffaa00;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #root {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            padding: 1rem;
+            background: var(--surface-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+        }
+
+        .timer-container {
+            flex: 0 0 auto;
+            padding: 2rem;
+            text-align: center;
+            background: linear-gradient(180deg, var(--surface-color) 0%, var(--bg-color) 100%);
+        }
+
+        .main-timer {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 5rem;
+            font-weight: 700;
+            color: var(--accent-color);
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+            margin-bottom: 0.5rem;
+        }
+
+        .race-status {
+            text-transform: uppercase;
+            letter-spacing: 0.2rem;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+
+        .controls {
+            padding: 1rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            background: var(--bg-color);
+        }
+
+        button {
+            padding: 1.5rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.2rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform 0.1s, background-color 0.2s;
+            text-transform: uppercase;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        .btn-start {
+            background-color: var(--accent-color);
+            color: black;
+            grid-column: span 2;
+        }
+
+        .btn-stop {
+            background-color: var(--error-color);
+            color: white;
+            grid-column: span 1;
+        }
+
+        .btn-reset {
+            background-color: #333;
+            color: white;
+            grid-column: span 1;
+        }
+
+        .entry-section {
+            padding: 1rem;
+            background: var(--surface-color);
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .bib-input {
+            flex: 1;
+            padding: 1rem;
+            background: #2a2a2a;
+            border: 2px solid #333;
+            border-radius: 8px;
+            color: white;
+            font-size: 1.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            outline: none;
+        }
+
+        .bib-input:focus {
+            border-color: var(--accent-color);
+        }
+
+        .btn-record {
+            background-color: var(--accent-color);
+            color: black;
+            padding: 0 2rem;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+
+        .results-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .result-item {
+            display: grid;
+            grid-template-columns: 3rem 1fr 1fr;
+            padding: 1rem;
+            background: #1a1a1a;
+            margin-bottom: 0.5rem;
+            border-radius: 8px;
+            align-items: center;
+        }
+
+        .rank {
+            color: var(--text-dim);
+            font-weight: bold;
+        }
+
+        .bib-num {
+            font-weight: 800;
+            font-size: 1.2rem;
+        }
+
+        .time {
+            text-align: right;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-color);
+        }
+
+        .empty-state {
+            text-align: center;
+            color: var(--text-dim);
+            padding: 3rem;
+        }
+
+        .footer {
+            padding: 0.75rem;
+            background: var(--surface-color);
+            text-align: center;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            border-top: 1px solid #333;
+            letter-spacing: 0.05rem;
+            text-transform: uppercase;
+        }
+
+        /* Mobile specific adjustments */
+        @media (max-width: 480px) {
+            .main-timer { font-size: 3.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function App() {
+            const [time, setTime] = useState(0);
+            const [isRunning, setIsRunning] = useState(false);
+            const [results, setResults] = useState(() => {
+                const saved = localStorage.getItem('race_results');
+                return saved ? JSON.parse(saved) : [];
+            });
+            const [bibInput, setBibInput] = useState('');
+            const timerRef = useRef(null);
+            const startTimeRef = useRef(0);
+
+            useEffect(() => {
+                localStorage.setItem('race_results', JSON.stringify(results));
+            }, [results]);
+
+            const formatTime = (ms) => {
+                const h = Math.floor(ms / 3600000);
+                const m = Math.floor((ms % 3600000) / 60000);
+                const s = Math.floor((ms % 60000) / 1000);
+                const msRemain = Math.floor((ms % 1000) / 10);
+                
+                return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${msRemain.toString().padStart(2, '0')}`;
+            };
+
+            const startTimer = () => {
+                if (!isRunning) {
+                    setIsRunning(true);
+                    startTimeRef.current = Date.now() - time;
+                    const animate = () => {
+                        setTime(Date.now() - startTimeRef.current);
+                        timerRef.current = requestAnimationFrame(animate);
+                    };
+                    timerRef.current = requestAnimationFrame(animate);
+                }
+            };
+
+            const stopTimer = () => {
+                setIsRunning(false);
+                cancelAnimationFrame(timerRef.current);
+            };
+
+            const resetTimer = () => {
+                if (results.length > 0 && !confirm('Clear all race data?')) return;
+                stopTimer();
+                setTime(0);
+                setResults([]);
+                localStorage.removeItem('race_results');
+            };
+
+            const recordResult = (e) => {
+                if (e) e.preventDefault();
+                if (!bibInput.trim()) return;
+                
+                const newResult = {
+                    id: Date.now(),
+                    bib: bibInput.trim(),
+                    time: time,
+                    formatted: formatTime(time)
+                };
+
+                setResults(prev => [newResult, ...prev]);
+                setBibInput('');
+                
+                // Provide haptic feedback if available
+                if ('vibrate' in navigator) navigator.vibrate(50);
+            };
+
+            return (
+                <React.Fragment>
+                    <div className="header">
+                        <div style={{fontWeight: 800, fontSize: '1.2rem'}}>ACICTS</div>
+                        <div className="race-status">{isRunning ? '• LIVE' : 'STOPPED'}</div>
+                    </div>
+
+                    <div className="timer-container">
+                        <div className="main-timer">{formatTime(time)}</div>
+                        <div className="race-status">Race Clock</div>
+                    </div>
+
+                    <div className="controls">
+                        {!isRunning ? (
+                            <button className="btn-start" onClick={startTimer}>Mass Start</button>
+                        ) : (
+                            <button className="btn-stop" onClick={stopTimer}>Stop Clock</button>
+                        )}
+                        <button className="btn-reset" onClick={resetTimer}>Reset</button>
+                        <button className="btn-reset" onClick={() => {
+                             const csv = "Rank,Bib,Time\n" + results.map((r, i) => `${results.length - i},${r.bib},${r.formatted}`).reverse().join("\n");
+                             const blob = new Blob([csv], { type: 'text/csv' });
+                             const url = window.URL.createObjectURL(blob);
+                             const a = document.createElement('a');
+                             a.setAttribute('hidden', '');
+                             a.setAttribute('href', url);
+                             a.setAttribute('download', 'race_results.csv');
+                             document.body.appendChild(a);
+                             a.click();
+                             document.body.removeChild(a);
+                        }}>Export CSV</button>
+                    </div>
+
+                    <form className="entry-section" onSubmit={recordResult}>
+                        <input 
+                            type="text" 
+                            className="bib-input" 
+                            placeholder="BIB #" 
+                            value={bibInput}
+                            onChange={(e) => setBibInput(e.target.value)}
+                            pattern="[0-9]*"
+                            inputMode="numeric"
+                        />
+                        <button type="submit" className="btn-record">RECORD</button>
+                    </form>
+
+                    <div className="results-container">
+                        {results.length === 0 ? (
+                            <div className="empty-state">No finishers recorded yet</div>
+                        ) : (
+                            results.map((r, index) => (
+                                <div key={r.id} className="result-item">
+                                    <div className="rank">#{results.length - index}</div>
+                                    <div className="bib-num">BIB {r.bib}</div>
+                                    <div className="time">{r.formatted}</div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    <div className="footer">
+                        Developed by Sandith Tharul
+                    </div>
+                </React.Fragment>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
